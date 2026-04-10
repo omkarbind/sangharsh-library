@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>My Bookings – Sangharsh K Library</title>
+    <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+requireAuth();
+renderLayout('history', 'My Bookings');
+
+async function init() {
+    const area = document.getElementById('contentArea');
+    area.innerHTML = `<div class="card"><div class="card-title">📋 My Booking History</div>
+        <div id="bookingsContent"><p class="text-muted">Loading...</p></div></div>`;
+
+    try {
+        const bookings = await BookingAPI.myBookings();
+        renderBookings(bookings);
+    } catch(e) { document.getElementById('bookingsContent').innerHTML = `<p class="text-muted">${e.message}</p>`; }
+}
+
+function renderBookings(bookings) {
+    const el = document.getElementById('bookingsContent');
+    if (!bookings.length) {
+        el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div>
+            <p>No bookings yet. <a href="book-seat.html" style="color:#e8821a;font-weight:600">Book your first seat →</a></p></div>`;
+        return;
+    }
+
+    el.innerHTML = `
+        <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#ID</th><th>Seat</th><th>Section</th><th>Date</th>
+                    <th>Time</th><th>Hours</th><th>Amount</th>
+                    <th>Status</th><th>Payment</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${bookings.map(b => `
+                <tr>
+                    <td data-label="ID">#${b.id}</td>
+                    <td data-label="Seat"><b>${b.seatNumber}</b></td>
+                    <td data-label="Section">${b.section}</td>
+                    <td data-label="Date">${b.bookingDate}</td>
+                    <td data-label="Time">${b.startTime} – ${b.endTime}</td>
+                    <td data-label="Hours">${b.totalHours}h</td>
+                    <td data-label="Amount"><b>${formatCurrency(b.totalAmount)}</b></td>
+                    <td data-label="Status">${statusBadge(b.status)}</td>
+                    <td data-label="Payment">${statusBadge(b.paymentStatus)}</td>
+                    <td data-label="Actions">
+                        <div style="display:flex;gap:6px;flex-wrap:wrap">
+                            ${b.status === 'CONFIRMED' && b.paymentStatus === 'PENDING'
+                                ? `<button class="btn btn-success btn-sm" onclick="payNow(${b.id})">💳 Pay</button>` : ''}
+                            ${b.status === 'CONFIRMED'
+                                ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking(${b.id})">✕ Cancel</button>` : ''}
+                        </div>
+                    </td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+        </div>`;
+}
+
+async function payNow(id) {
+    if (!confirm('Simulate payment for this booking?')) return;
+    try {
+        await BookingAPI.confirmPayment(id);
+        showToast('Payment confirmed! ✅', 'success');
+        init();
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function cancelBooking(id) {
+    if (!confirm('Are you sure you want to cancel this booking?')) return;
+    try {
+        await BookingAPI.cancel(id);
+        showToast('Booking cancelled', 'info');
+        init();
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+init();
+</script>
+</body>
+</html>

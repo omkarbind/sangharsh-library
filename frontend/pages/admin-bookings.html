@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>All Bookings – Sangharsh K Library</title>
+    <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+requireAdmin();
+renderLayout('bookings', 'All Bookings');
+
+async function init() {
+    const area = document.getElementById('contentArea');
+    area.innerHTML = `
+        <div class="card">
+            <div class="section-header">
+                <h2>All Bookings</h2>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Search seat / user..." style="width:200px" oninput="filterTable()"/>
+                    <select id="statusFilter" class="form-control" style="width:140px" onchange="filterTable()">
+                        <option value="">All Status</option>
+                        <option value="CONFIRMED">Confirmed</option>
+                        <option value="CANCELLED">Cancelled</option>
+                        <option value="COMPLETED">Completed</option>
+                    </select>
+                </div>
+            </div>
+            <div id="bookingsTable"><p class="text-muted">Loading...</p></div>
+        </div>`;
+
+    await loadBookings();
+}
+
+let allBookings = [];
+
+async function loadBookings() {
+    try {
+        allBookings = await BookingAPI.allBookings();
+        renderTable(allBookings);
+    } catch(e) { document.getElementById('bookingsTable').innerHTML = `<p class="text-muted">${e.message}</p>`; }
+}
+
+function filterTable() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    const s = document.getElementById('statusFilter').value;
+    const filtered = allBookings.filter(b =>
+        (!s || b.status === s) &&
+        (!q || b.seatNumber.toLowerCase().includes(q) || b.userName.toLowerCase().includes(q) || b.userEmail.toLowerCase().includes(q))
+    );
+    renderTable(filtered);
+}
+
+function renderTable(bookings) {
+    const el = document.getElementById('bookingsTable');
+    if (!bookings.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No bookings found</p></div>'; return; }
+    el.innerHTML = `<div class="table-wrapper"><table>
+        <thead><tr><th>#</th><th>User</th><th>Seat</th><th>Date</th><th>Time</th><th>Hours</th><th>Rate</th><th>Total</th><th>Status</th><th>Payment</th><th>Action</th></tr></thead>
+        <tbody>
+            ${bookings.map(b => `
+            <tr>
+                <td data-label="ID">#${b.id}</td>
+                <td data-label="User"><b>${b.userName}</b><br/><span style="font-size:0.74rem;color:#6b7280">${b.userEmail}</span></td>
+                <td data-label="Seat"><b>${b.seatNumber}</b> – ${b.section}</td>
+                <td data-label="Date">${b.bookingDate}</td>
+                <td data-label="Time">${b.startTime} – ${b.endTime}</td>
+                <td data-label="Hours">${b.totalHours}h</td>
+                <td data-label="Rate">₹${b.hourlyRate}/hr</td>
+                <td data-label="Total"><b>${formatCurrency(b.totalAmount)}</b></td>
+                <td data-label="Status">${statusBadge(b.status)}</td>
+                <td data-label="Payment">${statusBadge(b.paymentStatus)}</td>
+                <td data-label="Action">
+                    ${b.status === 'CONFIRMED' ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking(${b.id})">Cancel</button>` : '–'}
+                </td>
+            </tr>`).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+async function cancelBooking(id) {
+    if (!confirm('Cancel this booking?')) return;
+    try {
+        await BookingAPI.cancel(id);
+        showToast('Booking cancelled', 'info');
+        loadBookings();
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Pricing – Sangharsh K Library</title>
+    <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+requireAdmin();
+renderLayout('pricing', 'Pricing Settings');
+
+async function init() {
+    const area = document.getElementById('contentArea');
+
+    let current = null;
+    try { current = await PricingAPI.current(); } catch(e) {}
+
+    area.innerHTML = `
+        <!-- Current Pricing -->
+        <div class="card" style="background:linear-gradient(135deg,#0f1f3d,#1a3260);color:white;margin-bottom:24px">
+            <div style="font-size:0.8rem;opacity:0.6;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Current Active Rate</div>
+            <div style="font-size:3.5rem;font-weight:700;color:#e8821a;font-family:'Playfair Display',serif">
+                ${current ? '₹' + current.hourlyRate : '–'}
+            </div>
+            <div style="font-size:0.9rem;opacity:0.7;margin-top:4px">per hour &nbsp;|&nbsp; ${current ? current.description || 'Standard rate' : 'No pricing set'}</div>
+        </div>
+
+        <!-- Update Pricing -->
+        <div class="card">
+            <div class="card-title">💰 Update Hourly Rate</div>
+            <div class="form-group">
+                <label class="form-label">New Rate (₹ per hour) *</label>
+                <input type="number" id="newRate" class="form-control" placeholder="e.g. 20" min="1" step="0.5" value="${current ? current.hourlyRate : ''}"/>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description (optional)</label>
+                <input type="text" id="rateDesc" class="form-control" placeholder="e.g. Revised rate for 2025"/>
+            </div>
+            <button class="btn btn-saffron" onclick="updatePricing()">💾 Save New Rate</button>
+        </div>
+
+        <!-- Calculator Preview -->
+        <div class="card">
+            <div class="card-title">🧮 Rate Calculator Preview</div>
+            <p class="text-muted" style="margin-bottom:16px">See how much members will be charged at different durations.</p>
+            <div id="calcTable"></div>
+        </div>`;
+
+    renderCalc(current ? parseFloat(current.hourlyRate) : 20);
+    document.getElementById('newRate').addEventListener('input', () => {
+        const v = parseFloat(document.getElementById('newRate').value);
+        if (!isNaN(v) && v > 0) renderCalc(v);
+    });
+}
+
+function renderCalc(rate) {
+    const durations = [1, 2, 3, 4, 5, 6, 8, 10, 12];
+    document.getElementById('calcTable').innerHTML = `
+        <div class="table-wrapper"><table>
+            <thead><tr><th>Duration</th><th>Amount</th></tr></thead>
+            <tbody>
+                ${durations.map(h => `
+                <tr>
+                    <td>${h} hour${h>1?'s':''}</td>
+                    <td><b>₹${(rate * h).toFixed(2)}</b></td>
+                </tr>`).join('')}
+            </tbody>
+        </table></div>`;
+}
+
+async function updatePricing() {
+    const hourlyRate = parseFloat(document.getElementById('newRate').value);
+    const description = document.getElementById('rateDesc').value.trim();
+    if (!hourlyRate || hourlyRate <= 0) { showToast('Please enter a valid rate', 'error'); return; }
+    if (!confirm(`Set new hourly rate to ₹${hourlyRate}? Old rates will be deactivated.`)) return;
+    try {
+        await PricingAPI.set({ hourlyRate, description });
+        showToast('Pricing updated successfully!', 'success');
+        init();
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+init();
+</script>
+</body>
+</html>

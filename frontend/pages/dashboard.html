@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Dashboard – Sangharsh K Library</title>
+    <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+requireAuth();
+renderLayout('dashboard', 'Dashboard');
+
+async function init() {
+    const user = getUser();
+    const area = document.getElementById('contentArea');
+
+    let pricing = null;
+    try { pricing = await PricingAPI.current(); } catch(e) {}
+
+    let bookings = [];
+    try { bookings = await BookingAPI.myBookings(); } catch(e) {}
+
+    const confirmed = bookings.filter(b => b.status === 'CONFIRMED').length;
+    const cancelled = bookings.filter(b => b.status === 'CANCELLED').length;
+    const pendingPay = bookings.filter(b => b.paymentStatus === 'PENDING' && b.status !== 'CANCELLED').length;
+
+    area.innerHTML = `
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-value">${bookings.length}</div>
+                <div class="stat-label">Total Bookings</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-value">${confirmed}</div>
+                <div class="stat-label">Confirmed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">❌</div>
+                <div class="stat-value">${cancelled}</div>
+                <div class="stat-label">Cancelled</div>
+            </div>
+            <div class="stat-card" style="border-left-color:#e8821a">
+                <div class="stat-icon">💰</div>
+                <div class="stat-value">${pricing ? '₹' + pricing.hourlyRate : '--'}</div>
+                <div class="stat-label">Per Hour Rate</div>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;flex-wrap:wrap">
+            <!-- Quick actions -->
+            <div class="card">
+                <div class="card-title">⚡ Quick Actions</div>
+                <div style="display:flex;flex-direction:column;gap:12px">
+                    <a href="book-seat.html" class="btn btn-saffron" style="justify-content:center">
+                        🪑 Book a Seat Now
+                    </a>
+                    <a href="my-bookings.html" class="btn btn-outline" style="justify-content:center">
+                        📋 View My Bookings
+                    </a>
+                </div>
+                ${pendingPay > 0 ? `<div style="margin-top:16px;padding:12px;background:#fff4e6;border-radius:8px;font-size:0.85rem;color:#c05c00">
+                    ⚠️ You have <b>${pendingPay}</b> booking(s) with pending payment.
+                    <a href="my-bookings.html" style="color:#e8821a;font-weight:700"> Pay now →</a>
+                </div>` : ''}
+            </div>
+
+            <!-- Recent Bookings -->
+            <div class="card">
+                <div class="card-title">🕐 Recent Bookings</div>
+                ${bookings.length === 0 ? `<div class="empty-state"><div class="empty-icon">📭</div><p>No bookings yet</p></div>` :
+                bookings.slice(0, 4).map(b => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eef0f6">
+                        <div>
+                            <div style="font-weight:600;font-size:0.9rem">Seat ${b.seatNumber} – ${b.section}</div>
+                            <div style="font-size:0.78rem;color:#6b7280">${b.bookingDate} &nbsp;|&nbsp; ${b.startTime} – ${b.endTime}</div>
+                        </div>
+                        <div>${statusBadge(b.status)}</div>
+                    </div>`).join('')}
+                ${bookings.length > 4 ? `<a href="my-bookings.html" class="text-muted mt-4" style="display:block;text-align:center;font-size:0.82rem">View all ${bookings.length} bookings →</a>` : ''}
+            </div>
+        </div>
+
+        <!-- Info Banner -->
+        <div class="card" style="background:linear-gradient(135deg,#0f1f3d,#1a3260);color:white;margin-top:0">
+            <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+                <div style="font-size:3rem">📚</div>
+                <div>
+                    <div style="font-family:'Playfair Display',serif;font-size:1.3rem;color:#f5a03a">Sangharsh K Library</div>
+                    <div style="font-size:0.85rem;opacity:0.75;margin-top:4px">📍 Greater Noida, Uttar Pradesh &nbsp;|&nbsp; Open daily for serious learners</div>
+                    <div style="font-size:0.85rem;opacity:0.75;margin-top:2px">💡 Current rate: ${pricing ? '₹' + pricing.hourlyRate + '/hour' : 'Contact admin'}</div>
+                </div>
+            </div>
+        </div>`;
+}
+
+init();
+</script>
+</body>
+</html>

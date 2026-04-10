@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Book a Seat – Sangharsh K Library</title>
+    <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+requireAuth();
+renderLayout('book', 'Book a Seat');
+
+let selectedSeatId = null;
+let currentPricing = null;
+let seatsData = [];
+
+async function init() {
+    const area = document.getElementById('contentArea');
+
+    try { currentPricing = await PricingAPI.current(); } catch(e) {}
+
+    // Default date = today
+    const today = new Date().toISOString().split('T')[0];
+
+    area.innerHTML = `
+        <!-- Step 1: Select Date & Time -->
+        <div class="card">
+            <div class="card-title">📅 Step 1: Select Date & Time</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="bookDate" class="form-control" value="${today}" min="${today}"/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Start Time</label>
+                    <input type="time" id="startTime" class="form-control" value="09:00"/>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">End Time</label>
+                    <input type="time" id="endTime" class="form-control" value="11:00"/>
+                </div>
+                <div class="form-group" style="display:flex;align-items:flex-end">
+                    <button class="btn btn-primary w-full" onclick="searchSeats()">🔍 Search Available Seats</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Choose Seat -->
+        <div class="card" id="seatSelectionCard" style="display:none">
+            <div class="card-title">🪑 Step 2: Choose Your Seat</div>
+            <div class="seat-legend">
+                <div class="legend-item"><div class="legend-dot available"></div> Available</div>
+                <div class="legend-item"><div class="legend-dot booked"></div> Booked</div>
+                <div class="legend-item"><div class="legend-dot selected"></div> Selected</div>
+            </div>
+            <div class="seats-grid" id="seatsGrid"></div>
+        </div>
+
+        <!-- Step 3: Summary & Confirm -->
+        <div class="card" id="summaryCard" style="display:none">
+            <div class="card-title">💳 Step 3: Review & Confirm</div>
+            <div id="summaryContent"></div>
+            <div style="display:flex;gap:12px;margin-top:16px">
+                <button class="btn btn-outline" onclick="cancelSelection()">← Change Seat</button>
+                <button class="btn btn-saffron" onclick="confirmBooking()">✅ Confirm Booking</button>
+            </div>
+        </div>`;
+}
+
+async function searchSeats() {
+    const date  = document.getElementById('bookDate').value;
+    const start = document.getElementById('startTime').value;
+    const end   = document.getElementById('endTime').value;
+
+    if (!date || !start || !end) { showToast('Please fill date and time', 'error'); return; }
+    if (start >= end) { showToast('End time must be after start time', 'error'); return; }
+
+    const hours = (new Date(`2000-01-01T${end}`) - new Date(`2000-01-01T${start}`)) / 3600000;
+    if (hours < 1) { showToast('Minimum booking is 1 hour', 'error'); return; }
+
+    try {
+        seatsData = await SeatAPI.available(date, start, end);
+        renderSeats();
+        document.getElementById('seatSelectionCard').style.display = 'block';
+        document.getElementById('summaryCard').style.display = 'none';
+        selectedSeatId = null;
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+function renderSeats() {
+    const grid = document.getElementById('seatsGrid');
+    if (!seatsData.length) { grid.innerHTML = '<div class="empty-state"><div class="empty-icon">😔</div><p>No seats found</p></div>'; return; }
+
+    // Group by section
+    const sections = {};
+    seatsData.forEach(s => { (sections[s.section] = sections[s.section] || []).push(s); });
+
+    grid.innerHTML = Object.entries(sections).map(([sec, seats]) => `
+        <div style="grid-column:1/-1;font-weight:700;font-size:0.8rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;padding:8px 0 4px;border-top:2px solid #eef0f6;margin-top:8px">
+            ${sec}
+        </div>
+        ${seats.map(s => `
+            <div class="seat-card ${s.available ? 'available' : 'booked'} ${selectedSeatId === s.id ? 'selected' : ''}"
+                 id="seat-${s.id}"
+                 onclick="${s.available ? `selectSeat(${s.id})` : ''}">
+                <div class="seat-number">${s.seatNumber}</div>
+                <div class="seat-section">${s.description || ''}</div>
+                <div class="seat-status">${s.available ? '✅ Free' : '🔴 Booked'}</div>
+            </div>`).join('')}
+    `).join('');
+}
+
+function selectSeat(seatId) {
+    selectedSeatId = seatId;
+    // Update UI
+    document.querySelectorAll('.seat-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById(`seat-${seatId}`).classList.add('selected');
+    renderSummary(seatId);
+}
+
+function renderSummary(seatId) {
+    const seat  = seatsData.find(s => s.id === seatId);
+    const date  = document.getElementById('bookDate').value;
+    const start = document.getElementById('startTime').value;
+    const end   = document.getElementById('endTime').value;
+    const hours = (new Date(`2000-01-01T${end}`) - new Date(`2000-01-01T${start}`)) / 3600000;
+    const rate  = currentPricing ? parseFloat(currentPricing.hourlyRate) : 0;
+    const total = (hours * rate).toFixed(2);
+
+    document.getElementById('summaryCard').style.display = 'block';
+    document.getElementById('summaryContent').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+            <div><div class="form-label">Seat</div><b>${seat.seatNumber} – ${seat.section}</b></div>
+            <div><div class="form-label">Date</div><b>${date}</b></div>
+            <div><div class="form-label">Start Time</div><b>${start}</b></div>
+            <div><div class="form-label">End Time</div><b>${end}</b></div>
+        </div>
+        <div class="price-box">
+            <div class="price-label">Price Breakdown</div>
+            <div class="price-row"><span>Duration</span><span>${hours} hour(s)</span></div>
+            <div class="price-row"><span>Rate per hour</span><span>₹${rate}</span></div>
+            <div style="border-top:1px solid rgba(255,255,255,0.2);margin:8px 0"></div>
+            <div class="price-row"><span class="price-label">Total Amount</span><span class="price-total">₹${total}</span></div>
+        </div>`;
+
+    document.getElementById('summaryCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelSelection() {
+    selectedSeatId = null;
+    document.querySelectorAll('.seat-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById('summaryCard').style.display = 'none';
+}
+
+async function confirmBooking() {
+    if (!selectedSeatId) { showToast('Please select a seat', 'error'); return; }
+    const date  = document.getElementById('bookDate').value;
+    const start = document.getElementById('startTime').value;
+    const end   = document.getElementById('endTime').value;
+
+    try {
+        const booking = await BookingAPI.create({
+            seatId: selectedSeatId,
+            bookingDate: date,
+            startTime: start,
+            endTime: end
+        });
+        showToast('🎉 Booking confirmed! Seat ' + booking.seatNumber, 'success');
+        setTimeout(() => window.location.href = 'my-bookings.html', 1200);
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+init();
+</script>
+</body>
+</html>

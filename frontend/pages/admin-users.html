@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Manage Users – Sangharsh K Library</title>
+    <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+requireAdmin();
+renderLayout('users', 'Manage Users');
+
+async function init() {
+    const area = document.getElementById('contentArea');
+    area.innerHTML = `
+        <div class="card">
+            <div class="section-header">
+                <h2>All Members</h2>
+                <input type="text" id="searchInput" class="form-control" placeholder="Search name / email..." style="width:220px" oninput="filterUsers()"/>
+            </div>
+            <div id="usersTable"><p class="text-muted">Loading...</p></div>
+        </div>`;
+
+    await loadUsers();
+}
+
+let allUsers = [];
+
+async function loadUsers() {
+    try {
+        allUsers = await AdminAPI.users();
+        renderUsers(allUsers);
+    } catch(e) { document.getElementById('usersTable').innerHTML = `<p class="text-muted">${e.message}</p>`; }
+}
+
+function filterUsers() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    renderUsers(allUsers.filter(u => u.fullName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+}
+
+function renderUsers(users) {
+    const el = document.getElementById('usersTable');
+    if (!users.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><p>No users found</p></div>'; return; }
+    el.innerHTML = `<div class="table-wrapper"><table>
+        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Joined</th><th>Action</th></tr></thead>
+        <tbody>
+            ${users.map(u => `
+            <tr>
+                <td data-label="ID">${u.id}</td>
+                <td data-label="Name">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <div class="avatar" style="width:30px;height:30px;font-size:0.75rem">${u.fullName.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}</div>
+                        <b>${u.fullName}</b>
+                    </div>
+                </td>
+                <td data-label="Email">${u.email}</td>
+                <td data-label="Phone">${u.phone || '–'}</td>
+                <td data-label="Role"><span class="badge ${u.role==='ADMIN'?'badge-blue':'badge-gray'}">${u.role}</span></td>
+                <td data-label="Status">${u.active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Disabled</span>'}</td>
+                <td data-label="Joined">${u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : '–'}</td>
+                <td data-label="Action">
+                    ${u.role !== 'ADMIN' ? `<button class="btn btn-sm ${u.active ? 'btn-danger' : 'btn-success'}" onclick="toggleUser(${u.id})">
+                        ${u.active ? '🔴 Disable' : '🟢 Enable'}
+                    </button>` : '<span class="text-muted">–</span>'}
+                </td>
+            </tr>`).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+async function toggleUser(id) {
+    try {
+        const u = await AdminAPI.toggleUser(id);
+        showToast(`User ${u.active ? 'enabled' : 'disabled'}`, 'success');
+        loadUsers();
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Manage Seats – Sangharsh K Library</title>
+    <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+requireAdmin();
+renderLayout('seats', 'Manage Seats');
+
+async function init() {
+    const area = document.getElementById('contentArea');
+    area.innerHTML = `
+        <!-- Add Seat Form -->
+        <div class="card">
+            <div class="card-title">➕ Add New Seat</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Seat Number *</label>
+                    <input type="text" id="seatNum" class="form-control" placeholder="e.g. A1, B3, C5"/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Section / Floor</label>
+                    <input type="text" id="seatSection" class="form-control" placeholder="e.g. Ground Floor, AC Zone"/>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" id="seatDesc" class="form-control" placeholder="e.g. Near window, power outlet available"/>
+            </div>
+            <button class="btn btn-saffron" onclick="addSeat()">➕ Add Seat</button>
+        </div>
+
+        <!-- All Seats Table -->
+        <div class="card">
+            <div class="card-title">🪑 All Seats</div>
+            <div id="seatsTable"><p class="text-muted">Loading...</p></div>
+        </div>`;
+
+    loadSeats();
+}
+
+async function loadSeats() {
+    try {
+        const seats = await SeatAPI.all();
+        const el = document.getElementById('seatsTable');
+        if (!seats.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">🪑</div><p>No seats added yet</p></div>'; return; }
+
+        el.innerHTML = `<div class="table-wrapper"><table>
+            <thead><tr><th>#</th><th>Seat No.</th><th>Section</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+                ${seats.map(s => `
+                <tr>
+                    <td data-label="ID">${s.id}</td>
+                    <td data-label="Seat"><b>${s.seatNumber}</b></td>
+                    <td data-label="Section">${s.section || '–'}</td>
+                    <td data-label="Desc">${s.description || '–'}</td>
+                    <td data-label="Status">${s.active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Inactive</span>'}</td>
+                    <td data-label="Actions">
+                        <div style="display:flex;gap:8px">
+                            <button class="btn btn-outline btn-sm" onclick="toggleSeat(${s.id})">
+                                ${s.active ? '🔴 Disable' : '🟢 Enable'}
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteSeat(${s.id}, '${s.seatNumber}')">🗑️ Delete</button>
+                        </div>
+                    </td>
+                </tr>`).join('')}
+            </tbody>
+        </table></div>`;
+    } catch(e) { document.getElementById('seatsTable').innerHTML = `<p class="text-muted">${e.message}</p>`; }
+}
+
+async function addSeat() {
+    const seatNumber = document.getElementById('seatNum').value.trim().toUpperCase();
+    const section    = document.getElementById('seatSection').value.trim();
+    const description = document.getElementById('seatDesc').value.trim();
+    if (!seatNumber) { showToast('Seat number is required', 'error'); return; }
+    try {
+        await SeatAPI.add({ seatNumber, section, description });
+        showToast(`Seat ${seatNumber} added!`, 'success');
+        document.getElementById('seatNum').value = '';
+        document.getElementById('seatSection').value = '';
+        document.getElementById('seatDesc').value = '';
+        loadSeats();
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function toggleSeat(id) {
+    try {
+        const s = await SeatAPI.toggle(id);
+        showToast(`Seat ${s.active ? 'enabled' : 'disabled'}`, 'success');
+        loadSeats();
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteSeat(id, num) {
+    if (!confirm(`Permanently delete Seat ${num}? This cannot be undone.`)) return;
+    try {
+        await SeatAPI.delete(id);
+        showToast(`Seat ${num} deleted`, 'info');
+        loadSeats();
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+init();
+</script>
+</body>
+</html>

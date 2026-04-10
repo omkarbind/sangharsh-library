@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Admin Dashboard – Sangharsh K Library</title>
+    <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<script src="../js/api.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+requireAdmin();
+renderLayout('admin', 'Admin Dashboard');
+
+async function init() {
+    const area = document.getElementById('contentArea');
+    area.innerHTML = '<p class="text-muted">Loading...</p>';
+
+    try {
+        const stats    = await AdminAPI.dashboard();
+        const bookings = await BookingAPI.allBookings();
+
+        area.innerHTML = `
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🪑</div>
+                    <div class="stat-value">${stats.totalSeats}</div>
+                    <div class="stat-label">Total Active Seats</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-value">${stats.totalUsers}</div>
+                    <div class="stat-label">Registered Members</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📅</div>
+                    <div class="stat-value">${stats.todayBookings}</div>
+                    <div class="stat-label">Today's Bookings</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📋</div>
+                    <div class="stat-value">${stats.totalBookings}</div>
+                    <div class="stat-label">Total Bookings</div>
+                </div>
+                <div class="stat-card" style="border-left-color:#e8821a">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-value">${stats.currentHourlyRate ? '₹'+stats.currentHourlyRate : '--'}</div>
+                    <div class="stat-label">Hourly Rate</div>
+                </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:28px">
+                <a href="admin-seats.html" class="btn btn-primary" style="justify-content:center">🪑 Manage Seats</a>
+                <a href="admin-users.html" class="btn btn-outline" style="justify-content:center">👥 Manage Users</a>
+                <a href="admin-pricing.html" class="btn btn-saffron" style="justify-content:center">💰 Set Pricing</a>
+                <a href="admin-bookings.html" class="btn btn-outline" style="justify-content:center">📋 All Bookings</a>
+            </div>
+
+            <!-- Recent Bookings -->
+            <div class="card">
+                <div class="section-header">
+                    <h2>Recent Bookings</h2>
+                    <a href="admin-bookings.html" class="text-muted" style="font-size:0.85rem">View all →</a>
+                </div>
+                <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>#</th><th>User</th><th>Seat</th><th>Date</th><th>Time</th><th>Amount</th><th>Status</th><th>Payment</th></tr>
+                    </thead>
+                    <tbody>
+                        ${bookings.slice(0, 10).map(b => `
+                        <tr>
+                            <td data-label="ID">#${b.id}</td>
+                            <td data-label="User">${b.userName}<br/><span style="font-size:0.75rem;color:#6b7280">${b.userEmail}</span></td>
+                            <td data-label="Seat"><b>${b.seatNumber}</b></td>
+                            <td data-label="Date">${b.bookingDate}</td>
+                            <td data-label="Time">${b.startTime}–${b.endTime}</td>
+                            <td data-label="Amount"><b>${formatCurrency(b.totalAmount)}</b></td>
+                            <td data-label="Status">${statusBadge(b.status)}</td>
+                            <td data-label="Payment">${statusBadge(b.paymentStatus)}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+                </div>
+            </div>`;
+    } catch(e) {
+        area.innerHTML = `<div class="card"><p class="text-muted">${e.message}</p></div>`;
+    }
+}
+
+init();
+</script>
+</body>
+</html>
